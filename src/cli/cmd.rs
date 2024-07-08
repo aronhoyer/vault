@@ -1,9 +1,11 @@
 use std::{
     fs::{create_dir_all, File},
-    io::Write,
-    os::unix::{fs::PermissionsExt, process::CommandExt},
+    io::{Read, Write},
+    os::unix::fs::PermissionsExt,
     process::{exit, Command, Stdio},
 };
+
+use arboard::Clipboard;
 
 use crate::{
     crypto::generate_password,
@@ -76,13 +78,30 @@ pub fn create(name: String) {
     println!("{password}");
 }
 
-pub fn get(name: String) {
+pub fn get(name: String, clip: bool) {
     let vault_path = get_vault_path();
     let entry_path = vault_path.join(format!("{name}.gpg"));
 
-    Command::new("gpg")
+    let gpg = Command::new("gpg")
         .args(["--quiet", "--decrypt", entry_path.to_str().unwrap()])
-        .exec();
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Failed to execute gpg");
+    let mut password = String::new();
+    gpg.stdout.unwrap().read_to_string(&mut password).unwrap();
+
+    if clip {
+        let mut clipboard = Clipboard::new().expect("Failed to access clipboard");
+        clipboard
+            .set_text(password)
+            .expect("Failed to copy password to clipboard");
+
+        println!("Password has been copied to clipboard.");
+        println!("However, you might not be able to paste it anywhere.");
+        println!("See https://github.com/1Password/arboard/blob/master/src/lib.rs#L49-L53 for more info.");
+    } else {
+        println!("{password}");
+    }
 }
 
 pub fn edit(_name: String) {
