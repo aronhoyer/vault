@@ -30,6 +30,13 @@ enum Commands {
     Edit {
         name: String,
     },
+    Rm {
+        name: String,
+    },
+    Mv {
+        source: String,
+        target: String,
+    },
 }
 
 pub fn parse() {
@@ -38,6 +45,8 @@ pub fn parse() {
         Commands::Create { name } => cmd::create(name),
         Commands::Get { name, clip } => cmd::get(name, clip),
         Commands::Edit { name } => cmd::edit(name),
+        Commands::Rm { name } => cmd::remove(name),
+        Commands::Mv { source, target } => cmd::move_entry(source, target),
     }
 }
 

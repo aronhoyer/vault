@@ -1,7 +1,7 @@
 use std::{
     env,
-    fs::{create_dir_all, remove_file, File},
-    io::{stdout, Read, Write},
+    fs::{create_dir_all, remove_file, rename, File},
+    io::{stdout, Error, ErrorKind, Read, Result, Write},
     os::unix::fs::PermissionsExt,
     path::PathBuf,
     process::{exit, Command, Stdio},
@@ -178,4 +178,65 @@ pub fn edit(name: String) {
     gpg.wait().unwrap();
 
     remove_file(&tmp_entry_path).expect("Failed to delete temp entry");
+}
+
+pub fn remove(name: String) {
+    let ans: Result<bool> =
+        match prompt("Are you sure you want to delete this entry? [y/N] ", false)
+            .unwrap_or("".to_string())
+            .as_ref()
+        {
+            "y" => Ok(true),
+            "" | "n" | "N" => Ok(false),
+            _ => Err(Error::new(ErrorKind::InvalidInput, "invalid input")),
+        };
+
+    if ans.is_err() {
+        stdout()
+            .write(ans.err().unwrap().to_string().as_bytes())
+            .unwrap();
+        exit(1);
+    }
+
+    if !ans.unwrap_or(false) {
+        println!("Nothing to do");
+        exit(0);
+    }
+
+    let entry_path = get_vault_path().join(format!("{name}.gpg"));
+    if !entry_path.exists() {
+        stdout()
+            .write(format!("{name} does not exist in vault").as_bytes())
+            .unwrap();
+        exit(1);
+    }
+
+    remove_file(entry_path).expect(format!("Couldn't delete {name}").as_str());
+}
+
+fn canonicalize_path(p: PathBuf) -> PathBuf {
+    let mut steps_up = 0;
+
+    for part in p.display().to_string().split("/").into_iter() {
+        if part == ".." {
+            steps_up += 1;
+        }
+    }
+
+    let mut resolved = p.clone();
+    for _ in 0..=steps_up {
+        resolved = resolved.parent().unwrap().to_path_buf();
+    }
+
+    return resolved.join(p.file_name().unwrap().to_str().unwrap());
+}
+
+pub fn move_entry(source: String, target: String) {
+    let source_path = get_vault_path().join(format!("{}.gpg", &source));
+    let target_path = canonicalize_path(get_vault_path().join(format!("{}.gpg", &target)));
+
+    if let Err(mv_err) = rename(source_path, target_path) {
+        stdout().write(mv_err.to_string().as_bytes()).unwrap();
+        exit(1);
+    }
 }
