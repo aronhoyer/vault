@@ -30,7 +30,7 @@ Vault will use either `$VAULT_PATH` or default to `$HOME/.local/vault` if `$VAUL
 
 ## Known issues
 
-- The `--clip` option doesn't work on Linux due to an [issue with the clipboard dependency](https://github.com/1Password/arboard/blob/master/README.md?plain=1#L22-L28) being used (PRs more than welcome on this).
+- The `--clip` option doesn't work on Linux due to an [issue with the clipboard dependency](https://github.com/1Password/arboard/blob/master/README.md?plain=1#L22-L28) being used (PRs more than welcome on this). TL;DR clipboard doesn't persist after the process exits.
 
 ## License
 
