@@ -1,7 +1,9 @@
 use std::{
-    fs::{create_dir_all, File},
-    io::{Read, Write},
+    env,
+    fs::{create_dir_all, remove_file, File},
+    io::{stdout, Read, Write},
     os::unix::fs::PermissionsExt,
+    path::PathBuf,
     process::{exit, Command, Stdio},
 };
 
@@ -104,11 +106,76 @@ pub fn get(name: String, clip: bool) {
     }
 }
 
-pub fn edit(_name: String) {
-    // TODO: implement this ish
-    // decrypt entry to into tmp file
-    // exec $EDITOR on tmp file
-    // re-encrypt entry with tmp file contents
+pub fn edit(name: String) {
+    let entry_path = get_vault_path().join(format!("{}.gpg", name));
+    if !entry_path.exists() {
+        stdout()
+            .write(format!("no such entry: {}\n", name).as_bytes())
+            .unwrap();
+        exit(1);
+    }
 
-    unimplemented!("command `edit` not yet implemented");
+    let tmp_vault = PathBuf::from(env::var("TMPDIR").unwrap_or(String::from("/tmp"))).join("vault");
+    if !tmp_vault.exists() {
+        create_dir_all(&tmp_vault).expect("Failed to create tmp vault");
+    }
+
+    let tmp_entry_path = tmp_vault.join(&name);
+    if !tmp_entry_path.parent().unwrap().exists() {
+        create_dir_all(tmp_entry_path.parent().unwrap())
+            .expect("Failed to create temp entry parent dir");
+    }
+
+    let tmp_entry = File::create(&tmp_entry_path).expect("Failed to create temp entry");
+
+    Command::new("gpg")
+        .args(["-q", "-d", entry_path.to_str().unwrap()])
+        .stdout(Stdio::from(tmp_entry))
+        .spawn()
+        .expect("Failed to spawn gpg")
+        .wait()
+        .unwrap();
+
+    let editor_cmd = env::var("EDITOR").unwrap_or(String::from("/usr/bin/vi"));
+
+    Command::new(&editor_cmd)
+        .arg(&tmp_entry_path)
+        .spawn()
+        .expect(format!("Failed to spawn {}", &editor_cmd).as_str())
+        .wait()
+        .unwrap();
+
+    let mut tmp_entry = File::options()
+        .read(true)
+        .open(&tmp_entry_path)
+        .expect("Failed to open temp entry in read-only mode");
+
+    let mut entry_buf = String::new();
+    tmp_entry
+        .read_to_string(&mut entry_buf)
+        .expect("Couldn't read entry to string");
+
+    let vault_entry = File::options()
+        .write(true)
+        .open(entry_path)
+        .expect("Failed to open entry file in write-only mode");
+
+    let mut gpg = Command::new("gpg")
+        .args(["-e", "-r", get_key_id().as_str()])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::from(vault_entry))
+        .spawn()
+        .expect("Failed to encrypt entry");
+
+    entry_buf = entry_buf.trim_end_matches("\n").to_string();
+
+    gpg.stdin
+        .as_mut()
+        .unwrap()
+        .write(entry_buf.as_bytes())
+        .expect("Failed to write to gpg stdin");
+
+    gpg.wait().unwrap();
+
+    remove_file(&tmp_entry_path).expect("Failed to delete temp entry");
 }
