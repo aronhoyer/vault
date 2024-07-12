@@ -235,6 +235,11 @@ pub fn move_entry(source: String, target: String) {
     let source_path = get_vault_path().join(format!("{}.gpg", &source));
     let target_path = canonicalize_path(get_vault_path().join(format!("{}.gpg", &target)));
 
+    let target_path_parent = target_path.parent().unwrap();
+    if !target_path_parent.exists() {
+        create_dir_all(target_path_parent).expect("Failed to create target parent dir");
+    }
+
     if let Err(mv_err) = rename(source_path, target_path) {
         stdout().write(mv_err.to_string().as_bytes()).unwrap();
         exit(1);
