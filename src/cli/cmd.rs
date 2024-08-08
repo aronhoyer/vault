@@ -1,7 +1,7 @@
 use std::{
     env,
     fs::{create_dir_all, remove_file, rename, File},
-    io::{stdout, Error, ErrorKind, Read, Result, Write},
+    io::{stderr, stdout, Error, ErrorKind, Read, Result, Write},
     os::unix::fs::PermissionsExt,
     path::PathBuf,
     process::{exit, Command, Stdio},
@@ -241,7 +241,12 @@ pub fn move_entry(source: String, target: String) {
     }
 
     if let Err(mv_err) = rename(source_path, target_path) {
-        stdout().write(mv_err.to_string().as_bytes()).unwrap();
+        stderr().write(mv_err.to_string().as_bytes()).unwrap();
         exit(1);
     }
+}
+
+pub fn list(subdir: Option<String>) {
+    let list_dir = get_vault_path().join(subdir.unwrap_or(String::new()));
+    println!("{:?}", list_dir);
 }

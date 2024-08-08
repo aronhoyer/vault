@@ -37,6 +37,9 @@ enum Commands {
         source: String,
         target: String,
     },
+    Ls {
+        subdir: Option<String>,
+    },
 }
 
 pub fn parse() {
@@ -47,6 +50,7 @@ pub fn parse() {
         Commands::Edit { name } => cmd::edit(name),
         Commands::Rm { name } => cmd::remove(name),
         Commands::Mv { source, target } => cmd::move_entry(source, target),
+        Commands::Ls { subdir } => cmd::list(subdir),
     }
 }
 
